@@ -7,6 +7,7 @@ This server uses markdown `## Heading` sections as the contract surface for issu
 1. `bug`
 2. `feature-request`
 3. `engineering-task`
+4. `product-opportunity`
 
 Each template has:
 
@@ -53,4 +54,3 @@ Use `LINEAR_TEMPLATE_OVERRIDES_JSON` to add or override templates:
   }
 }
 ```
-

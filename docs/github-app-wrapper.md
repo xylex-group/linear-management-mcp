@@ -54,6 +54,7 @@ Built-in templates:
 
 - `issue-bug`
 - `issue-feature`
+- `issue-product-opportunity`
 - `pull-request`
 
 Behavior:

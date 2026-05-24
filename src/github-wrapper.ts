@@ -35,6 +35,34 @@ export interface GitHubListRepositoriesInput {
   perPage?: number;
 }
 
+export interface GitHubRepositoryRef {
+  owner?: string;
+  repo: string;
+}
+
+export interface GitHubIssueInventoryInput extends GitHubRepositoryRef {
+  state?: "open" | "closed" | "all";
+  perPage?: number;
+  labels?: string;
+  since?: string;
+}
+
+export interface GitHubIssueInventoryItem {
+  id: number;
+  number: number;
+  title: string;
+  url: string;
+  body?: string;
+  state: string;
+  labels: string[];
+  assignees: string[];
+  milestone?: number;
+  comments: number;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
+}
+
 export interface GitHubCreateIssueInput {
   owner?: string;
   repo: string;
@@ -72,6 +100,14 @@ interface BoundIssueInfo {
   title: string;
   url: string;
   created: boolean;
+}
+
+function clampPerPage(perPage: number | undefined, defaultValue: number): number {
+  if (perPage === undefined || !Number.isFinite(perPage)) {
+    return defaultValue;
+  }
+
+  return Math.min(Math.max(Math.trunc(perPage), 1), 100);
 }
 
 export class GitHubAppService {
@@ -229,7 +265,7 @@ export class GitHubAppService {
 
   async listRepositories(input: GitHubListRepositoriesInput = {}) {
     const { octokit, ownerLogin, installationId } = await this.installationOctokit(input.owner);
-    const perPage = Math.min(Math.max(input.perPage ?? 50, 1), 100);
+    const perPage = clampPerPage(input.perPage, 50);
     const response = await octokit.rest.apps.listReposAccessibleToInstallation({
       per_page: perPage,
     });
@@ -246,6 +282,52 @@ export class GitHubAppService {
         defaultBranch: repo.default_branch,
         url: repo.html_url,
       })),
+    };
+  }
+
+  async listIssueInventory(input: GitHubIssueInventoryInput) {
+    if (!input.repo?.trim()) {
+      throw new Error("repo is required.");
+    }
+
+    const { octokit, ownerLogin, installationId } = await this.installationOctokit(input.owner);
+    const response = await octokit.rest.issues.listForRepo({
+      owner: ownerLogin,
+      repo: input.repo.trim(),
+      state: input.state ?? "open",
+      per_page: clampPerPage(input.perPage, 50),
+      labels: input.labels,
+      since: input.since,
+      sort: "updated",
+      direction: "desc",
+    });
+
+    return {
+      owner: ownerLogin,
+      repo: input.repo.trim(),
+      installationId,
+      totalReturned: response.data.length,
+      issues: response.data
+        .filter((issue) => !issue.pull_request)
+        .map(
+          (issue): GitHubIssueInventoryItem => ({
+            id: issue.id,
+            number: issue.number,
+            title: issue.title,
+            url: issue.html_url,
+            body: issue.body ?? undefined,
+            state: issue.state,
+            labels: issue.labels
+              .map((label) => (typeof label === "string" ? label : label.name))
+              .filter((label): label is string => Boolean(label)),
+            assignees: issue.assignees?.map((assignee) => assignee.login) ?? [],
+            milestone: issue.milestone?.number,
+            comments: issue.comments,
+            createdAt: issue.created_at,
+            updatedAt: issue.updated_at,
+            closedAt: issue.closed_at ?? undefined,
+          }),
+        ),
     };
   }
 

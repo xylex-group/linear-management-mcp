@@ -42,6 +42,23 @@ export const BUILTIN_GITHUB_TEMPLATES: GitHubTemplateCollection = {
     ],
     optionalSections: ["Dependencies", "Rollout Notes"],
   },
+  "issue-product-opportunity": {
+    key: "issue-product-opportunity",
+    displayName: "GitHub Product Opportunity",
+    description: "Track vetted product signals as governed repository work.",
+    requiredSections: [
+      "Signal",
+      "Customer/User Impact",
+      "Proposed Outcome",
+      "Outcome Metric",
+      "Guardrails",
+      "Evidence",
+      "Acceptance Criteria",
+      "Kill Criteria",
+      "What Would Change My Mind",
+    ],
+    optionalSections: ["Risk And Dependencies", "Portfolio Bet", "Cycle Fit", "References"],
+  },
   "pull-request": {
     key: "pull-request",
     displayName: "Pull Request Template",
@@ -135,4 +152,3 @@ export function mergeGitHubTemplates(
 
   return merged;
 }
-

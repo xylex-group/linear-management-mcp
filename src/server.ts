@@ -4,12 +4,26 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 
 import { GitHubAppService } from "./github-wrapper.js";
 import { LinearTemplateService } from "./linear-wrapper.js";
+import {
+  ProductManagementEngineService,
+  type ProductEngineAnalyzeInput,
+  type ProductEngineCreateInput,
+  type ProductEngineScoreInput,
+  type ProductGuardrailDefinition,
+  type ProductInitiativeInput,
+  type ProductKillCriterion,
+  type ProductMetricDefinition,
+  type ProductRequirementChecklist,
+  type ProductSignalInput,
+  type ProductSignalTarget,
+} from "./product-engine.js";
 
 export interface McpServerOptions {
   serverName: string;
   serverVersion: string;
   linearService: LinearTemplateService;
   githubService?: GitHubAppService;
+  productEngine: ProductManagementEngineService;
 }
 
 function jsonResponse(payload: unknown) {
@@ -33,6 +47,262 @@ function jsonError(message: string) {
     ],
     isError: true,
   };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function evidenceQuality(value: unknown) {
+  return value === "strong" || value === "medium" || value === "weak" ? value : undefined;
+}
+
+function portfolioBucket(value: unknown) {
+  return value === "core" || value === "adjacent" || value === "transformational"
+    ? value
+    : undefined;
+}
+
+function parseMetricDefinition(value: unknown): ProductMetricDefinition | undefined {
+  const record = asRecord(value);
+  if (
+    !record ||
+    typeof record.name !== "string" ||
+    typeof record.formula !== "string" ||
+    typeof record.timeframe !== "string" ||
+    typeof record.dataSource !== "string"
+  ) {
+    return undefined;
+  }
+
+  return {
+    name: record.name,
+    formula: record.formula,
+    timeframe: record.timeframe,
+    dataSource: record.dataSource,
+    target: typeof record.target === "string" ? record.target : undefined,
+  };
+}
+
+function parseGuardrailDefinition(value: unknown): ProductGuardrailDefinition | undefined {
+  const metric = parseMetricDefinition(value);
+  const record = asRecord(value);
+  if (!metric || !record) {
+    return undefined;
+  }
+
+  return {
+    ...metric,
+    owner: typeof record.owner === "string" ? record.owner : undefined,
+  };
+}
+
+function parseMetricDefinitions(value: unknown): ProductMetricDefinition[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const metrics = value
+    .map((item) => parseMetricDefinition(item))
+    .filter((metric): metric is ProductMetricDefinition => Boolean(metric));
+  return metrics.length > 0 ? metrics : undefined;
+}
+
+function parseGuardrailDefinitions(value: unknown): ProductGuardrailDefinition[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const metrics = value
+    .map((item) => parseGuardrailDefinition(item))
+    .filter((metric): metric is ProductGuardrailDefinition => Boolean(metric));
+  return metrics.length > 0 ? metrics : undefined;
+}
+
+function parseKillCriteria(value: unknown): ProductKillCriterion[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const criteria: ProductKillCriterion[] = [];
+  for (const item of value) {
+    const record = asRecord(item);
+    if (!record || typeof record.condition !== "string") {
+      continue;
+    }
+
+    criteria.push({
+      type:
+        record.type === "usage" ||
+        record.type === "cost" ||
+        record.type === "time" ||
+        record.type === "guardrail" ||
+        record.type === "evidence"
+          ? record.type
+          : undefined,
+      condition: record.condition,
+      threshold: typeof record.threshold === "string" ? record.threshold : undefined,
+      deadline: typeof record.deadline === "string" ? record.deadline : undefined,
+    });
+  }
+
+  return criteria.length > 0 ? criteria : undefined;
+}
+
+function parseRequirements(value: unknown): ProductRequirementChecklist | undefined {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  return {
+    privacy: typeof record.privacy === "string" ? record.privacy : undefined,
+    security: typeof record.security === "string" ? record.security : undefined,
+    accessibility:
+      typeof record.accessibility === "string" ? record.accessibility : undefined,
+  };
+}
+
+function parseSignalTarget(value: unknown): ProductSignalTarget | undefined {
+  const target = asRecord(value);
+  if (!target) {
+    return undefined;
+  }
+
+  const linear = asRecord(target.linear);
+  const github = asRecord(target.github);
+
+  return {
+    linear: linear
+      ? {
+          teamId: typeof linear.teamId === "string" ? linear.teamId : undefined,
+          templateKey: typeof linear.templateKey === "string" ? linear.templateKey : undefined,
+          priority: typeof linear.priority === "number" ? linear.priority : undefined,
+          labelIds: stringArray(linear.labelIds),
+          assigneeId: typeof linear.assigneeId === "string" ? linear.assigneeId : undefined,
+          stateId: typeof linear.stateId === "string" ? linear.stateId : undefined,
+          projectId: typeof linear.projectId === "string" ? linear.projectId : undefined,
+        }
+      : undefined,
+    github:
+      github && typeof github.repo === "string"
+        ? {
+            owner: typeof github.owner === "string" ? github.owner : undefined,
+            repo: github.repo,
+            templateKey:
+              typeof github.templateKey === "string" ? github.templateKey : undefined,
+            labels: stringArray(github.labels),
+            assignees: stringArray(github.assignees),
+            milestone: typeof github.milestone === "number" ? github.milestone : undefined,
+          }
+        : undefined,
+  };
+}
+
+function parseProductSignals(value: unknown): ProductSignalInput[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const signals: ProductSignalInput[] = [];
+  for (const item of value) {
+    const record = asRecord(item);
+    if (!record || typeof record.title !== "string" || typeof record.evidence !== "string") {
+      continue;
+    }
+
+    const signal: ProductSignalInput = {
+      title: record.title,
+      source: typeof record.source === "string" ? record.source : undefined,
+      evidence: record.evidence,
+      evidenceQuality: evidenceQuality(record.evidenceQuality),
+      whatWouldChangeMind:
+        typeof record.whatWouldChangeMind === "string" ? record.whatWouldChangeMind : undefined,
+      impact: typeof record.impact === "string" ? record.impact : undefined,
+      recommendation:
+        typeof record.recommendation === "string" ? record.recommendation : undefined,
+      acceptanceCriteria: stringArray(record.acceptanceCriteria),
+      outcomeMetric: parseMetricDefinition(record.outcomeMetric),
+      guardrailMetrics: parseGuardrailDefinitions(record.guardrailMetrics),
+      killCriteria: parseKillCriteria(record.killCriteria),
+      portfolioBucket: portfolioBucket(record.portfolioBucket),
+      requirements: parseRequirements(record.requirements),
+      confidence: typeof record.confidence === "number" ? record.confidence : undefined,
+      severity:
+        record.severity === "low" ||
+        record.severity === "medium" ||
+        record.severity === "high" ||
+        record.severity === "urgent"
+          ? record.severity
+          : undefined,
+      tags: stringArray(record.tags),
+      target: parseSignalTarget(record.target),
+    };
+    signals.push(signal);
+  }
+
+  return signals;
+}
+
+function parseProductInitiatives(value: unknown): ProductInitiativeInput[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const initiatives: ProductInitiativeInput[] = [];
+  for (const item of value) {
+    const record = asRecord(item);
+    if (!record || typeof record.title !== "string") {
+      continue;
+    }
+
+    initiatives.push({
+      title: record.title,
+      outcome: typeof record.outcome === "string" ? record.outcome : undefined,
+      evidence: typeof record.evidence === "string" ? record.evidence : undefined,
+      evidenceQuality: evidenceQuality(record.evidenceQuality),
+      whatWouldChangeMind:
+        typeof record.whatWouldChangeMind === "string" ? record.whatWouldChangeMind : undefined,
+      reach: typeof record.reach === "number" ? record.reach : undefined,
+      impact: typeof record.impact === "number" ? record.impact : undefined,
+      confidence: typeof record.confidence === "number" ? record.confidence : undefined,
+      effort: typeof record.effort === "number" ? record.effort : undefined,
+      ease: typeof record.ease === "number" ? record.ease : undefined,
+      importance: typeof record.importance === "number" ? record.importance : undefined,
+      satisfaction:
+        typeof record.satisfaction === "number" ? record.satisfaction : undefined,
+      costOfDelay:
+        typeof record.costOfDelay === "number" ? record.costOfDelay : undefined,
+      duration: typeof record.duration === "number" ? record.duration : undefined,
+      portfolioBucket: portfolioBucket(record.portfolioBucket),
+      metrics: parseMetricDefinitions(record.metrics),
+      guardrails: parseGuardrailDefinitions(record.guardrails),
+      killCriteria: parseKillCriteria(record.killCriteria),
+      requirements: parseRequirements(record.requirements),
+      tags: stringArray(record.tags),
+      owner: typeof record.owner === "string" ? record.owner : undefined,
+    });
+  }
+
+  return initiatives;
+}
+
+function parseDefaultLinear(value: unknown): ProductSignalTarget["linear"] | undefined {
+  return parseSignalTarget({ linear: value })?.linear;
+}
+
+function parseDefaultGitHub(value: unknown): ProductSignalTarget["github"] | undefined {
+  return parseSignalTarget({ github: value })?.github;
 }
 
 export function createMcpServer(options: McpServerOptions): Server {
@@ -156,6 +426,334 @@ export function createMcpServer(options: McpServerOptions): Server {
             templateKey: { type: "string", description: "Template key." },
           },
           required: ["issueId"],
+        },
+      },
+      {
+        name: "product_engine_analyze_backlog",
+        description:
+          "Analyze Linear and GitHub work for stale issues, previous-cycle carry-over, and next-cycle candidates.",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            includeLinear: {
+              type: "boolean",
+              description: "Whether to include Linear inventory. Defaults to true.",
+            },
+            linearTeamId: {
+              type: "string",
+              description: "Linear team ID. Defaults to LINEAR_DEFAULT_TEAM_ID.",
+            },
+            linearLimit: {
+              type: "number",
+              description: "Maximum Linear issues to inspect, 1-100. Defaults to 50.",
+            },
+            includeSubTeams: {
+              type: "boolean",
+              description: "Include Linear sub-team issues. Defaults to true.",
+            },
+            githubRepositories: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  owner: { type: "string", description: "GitHub owner/org login." },
+                  repo: { type: "string", description: "Repository name." },
+                },
+                required: ["repo"],
+              },
+              description: "GitHub repositories to inspect when GitHub App auth is configured.",
+            },
+            githubState: {
+              type: "string",
+              description: "GitHub issue state to inspect: open, closed, or all. Defaults to open.",
+            },
+            githubLimitPerRepo: {
+              type: "number",
+              description: "Maximum GitHub issues per repository, 1-100. Defaults to 50.",
+            },
+            staleAfterDays: {
+              type: "number",
+              description: "Days without updates before an open item is stale.",
+            },
+            candidateLimit: {
+              type: "number",
+              description: "Maximum candidates returned per section.",
+            },
+            nextCycleCapacity: {
+              type: "number",
+              description: "Target number of next-cycle candidates.",
+            },
+            now: {
+              type: "string",
+              description: "Optional ISO timestamp used for deterministic stale analysis.",
+            },
+          },
+        },
+      },
+      {
+        name: "product_engine_create_proactive_issues",
+        description:
+          "Vet product signals with evidence, metrics, guardrails, kill criteria, and either plan or create issues.",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            mode: {
+              type: "string",
+              description: "plan, create-linear, or create-github. Defaults to plan.",
+            },
+            confidenceThreshold: {
+              type: "number",
+              description: "Minimum signal confidence between 0 and 1.",
+            },
+            maxCreate: {
+              type: "number",
+              description: "Maximum qualified signals to create in one call.",
+            },
+            defaultLinear: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                teamId: { type: "string" },
+                templateKey: { type: "string" },
+                priority: { type: "number" },
+                labelIds: { type: "array", items: { type: "string" } },
+                assigneeId: { type: "string" },
+                stateId: { type: "string" },
+                projectId: { type: "string" },
+              },
+            },
+            defaultGitHub: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                owner: { type: "string" },
+                repo: { type: "string" },
+                templateKey: { type: "string" },
+                labels: { type: "array", items: { type: "string" } },
+                assignees: { type: "array", items: { type: "string" } },
+                milestone: { type: "number" },
+              },
+              required: ["repo"],
+            },
+            signals: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  title: { type: "string" },
+                  source: { type: "string" },
+                  evidence: { type: "string" },
+                  evidenceQuality: { type: "string" },
+                  whatWouldChangeMind: { type: "string" },
+                  impact: { type: "string" },
+                  recommendation: { type: "string" },
+                  acceptanceCriteria: { type: "array", items: { type: "string" } },
+                  outcomeMetric: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      name: { type: "string" },
+                      formula: { type: "string" },
+                      timeframe: { type: "string" },
+                      dataSource: { type: "string" },
+                      target: { type: "string" },
+                    },
+                    required: ["name", "formula", "timeframe", "dataSource"],
+                  },
+                  guardrailMetrics: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        name: { type: "string" },
+                        formula: { type: "string" },
+                        timeframe: { type: "string" },
+                        dataSource: { type: "string" },
+                        target: { type: "string" },
+                        owner: { type: "string" },
+                      },
+                      required: ["name", "formula", "timeframe", "dataSource"],
+                    },
+                  },
+                  killCriteria: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        type: { type: "string" },
+                        condition: { type: "string" },
+                        threshold: { type: "string" },
+                        deadline: { type: "string" },
+                      },
+                      required: ["condition"],
+                    },
+                  },
+                  portfolioBucket: { type: "string" },
+                  requirements: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      privacy: { type: "string" },
+                      security: { type: "string" },
+                      accessibility: { type: "string" },
+                    },
+                  },
+                  confidence: { type: "number" },
+                  severity: { type: "string" },
+                  tags: { type: "array", items: { type: "string" } },
+                  target: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      linear: {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {
+                          teamId: { type: "string" },
+                          templateKey: { type: "string" },
+                          priority: { type: "number" },
+                          labelIds: { type: "array", items: { type: "string" } },
+                          assigneeId: { type: "string" },
+                          stateId: { type: "string" },
+                          projectId: { type: "string" },
+                        },
+                      },
+                      github: {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {
+                          owner: { type: "string" },
+                          repo: { type: "string" },
+                          templateKey: { type: "string" },
+                          labels: { type: "array", items: { type: "string" } },
+                          assignees: { type: "array", items: { type: "string" } },
+                          milestone: { type: "number" },
+                        },
+                        required: ["repo"],
+                      },
+                    },
+                  },
+                },
+                required: ["title", "evidence"],
+              },
+            },
+          },
+          required: ["signals"],
+        },
+      },
+      {
+        name: "product_engine_score_initiatives",
+        description:
+          "Score candidate initiatives with RICE, ICE, WSJF, or opportunity scoring and produce a Now/Next/Later roadmap with portfolio and governance checks.",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            method: {
+              type: "string",
+              description: "rice, ice, wsjf, or opportunity. Defaults to rice.",
+            },
+            capacity: { type: "number", description: "Total planning capacity." },
+            nowLimit: { type: "number", description: "Maximum Now roadmap items." },
+            nextLimit: { type: "number", description: "Maximum Next roadmap items." },
+            portfolioTarget: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                core: { type: "number" },
+                adjacent: { type: "number" },
+                transformational: { type: "number" },
+              },
+            },
+            initiatives: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  title: { type: "string" },
+                  outcome: { type: "string" },
+                  evidence: { type: "string" },
+                  evidenceQuality: { type: "string" },
+                  whatWouldChangeMind: { type: "string" },
+                  reach: { type: "number" },
+                  impact: { type: "number" },
+                  confidence: { type: "number" },
+                  effort: { type: "number" },
+                  ease: { type: "number" },
+                  importance: { type: "number" },
+                  satisfaction: { type: "number" },
+                  costOfDelay: { type: "number" },
+                  duration: { type: "number" },
+                  portfolioBucket: { type: "string" },
+                  metrics: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        name: { type: "string" },
+                        formula: { type: "string" },
+                        timeframe: { type: "string" },
+                        dataSource: { type: "string" },
+                        target: { type: "string" },
+                      },
+                      required: ["name", "formula", "timeframe", "dataSource"],
+                    },
+                  },
+                  guardrails: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        name: { type: "string" },
+                        formula: { type: "string" },
+                        timeframe: { type: "string" },
+                        dataSource: { type: "string" },
+                        target: { type: "string" },
+                        owner: { type: "string" },
+                      },
+                      required: ["name", "formula", "timeframe", "dataSource"],
+                    },
+                  },
+                  killCriteria: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        type: { type: "string" },
+                        condition: { type: "string" },
+                        threshold: { type: "string" },
+                        deadline: { type: "string" },
+                      },
+                      required: ["condition"],
+                    },
+                  },
+                  requirements: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      privacy: { type: "string" },
+                      security: { type: "string" },
+                      accessibility: { type: "string" },
+                    },
+                  },
+                  tags: { type: "array", items: { type: "string" } },
+                  owner: { type: "string" },
+                },
+                required: ["title"],
+              },
+            },
+          },
+          required: ["initiatives"],
         },
       },
     ];
@@ -414,6 +1012,112 @@ export function createMcpServer(options: McpServerOptions): Server {
               templateKey: typeof args.templateKey === "string" ? args.templateKey : undefined,
             }),
           );
+        }
+        case "product_engine_analyze_backlog": {
+          const repositories: ProductEngineAnalyzeInput["githubRepositories"] = [];
+          if (Array.isArray(args.githubRepositories)) {
+            for (const repository of args.githubRepositories) {
+              const record = asRecord(repository);
+              if (!record || typeof record.repo !== "string") {
+                continue;
+              }
+
+              repositories.push({
+                owner: typeof record.owner === "string" ? record.owner : undefined,
+                repo: record.repo,
+              });
+            }
+          }
+          const githubState =
+            args.githubState === "open" ||
+            args.githubState === "closed" ||
+            args.githubState === "all"
+              ? args.githubState
+              : undefined;
+          const input: ProductEngineAnalyzeInput = {
+            includeLinear:
+              typeof args.includeLinear === "boolean" ? args.includeLinear : undefined,
+            linearTeamId: typeof args.linearTeamId === "string" ? args.linearTeamId : undefined,
+            linearLimit: typeof args.linearLimit === "number" ? args.linearLimit : undefined,
+            includeSubTeams:
+              typeof args.includeSubTeams === "boolean" ? args.includeSubTeams : undefined,
+            githubRepositories: repositories.length > 0 ? repositories : undefined,
+            githubState,
+            githubLimitPerRepo:
+              typeof args.githubLimitPerRepo === "number"
+                ? args.githubLimitPerRepo
+                : undefined,
+            staleAfterDays:
+              typeof args.staleAfterDays === "number" ? args.staleAfterDays : undefined,
+            candidateLimit:
+              typeof args.candidateLimit === "number" ? args.candidateLimit : undefined,
+            nextCycleCapacity:
+              typeof args.nextCycleCapacity === "number" ? args.nextCycleCapacity : undefined,
+            now: typeof args.now === "string" ? args.now : undefined,
+          };
+
+          return jsonResponse(await options.productEngine.analyzeBacklog(input));
+        }
+        case "product_engine_create_proactive_issues": {
+          const signals = parseProductSignals(args.signals);
+          if (!signals) {
+            return jsonError("signals must be an array of objects with title and evidence.");
+          }
+
+          const mode =
+            args.mode === "plan" ||
+            args.mode === "create-linear" ||
+            args.mode === "create-github"
+              ? args.mode
+              : undefined;
+          const input: ProductEngineCreateInput = {
+            signals,
+            mode,
+            confidenceThreshold:
+              typeof args.confidenceThreshold === "number"
+                ? args.confidenceThreshold
+                : undefined,
+            maxCreate: typeof args.maxCreate === "number" ? args.maxCreate : undefined,
+            defaultLinear: parseDefaultLinear(args.defaultLinear),
+            defaultGitHub: parseDefaultGitHub(args.defaultGitHub),
+          };
+
+          return jsonResponse(await options.productEngine.createProactiveIssues(input));
+        }
+        case "product_engine_score_initiatives": {
+          const initiatives = parseProductInitiatives(args.initiatives);
+          if (!initiatives) {
+            return jsonError("initiatives must be an array of objects with at least a title.");
+          }
+
+          const method =
+            args.method === "rice" ||
+            args.method === "ice" ||
+            args.method === "wsjf" ||
+            args.method === "opportunity"
+              ? args.method
+              : undefined;
+          const target = asRecord(args.portfolioTarget);
+          const input: ProductEngineScoreInput = {
+            initiatives,
+            method,
+            capacity: typeof args.capacity === "number" ? args.capacity : undefined,
+            nowLimit: typeof args.nowLimit === "number" ? args.nowLimit : undefined,
+            nextLimit: typeof args.nextLimit === "number" ? args.nextLimit : undefined,
+            portfolioTarget: target
+              ? {
+                  core: typeof target.core === "number" ? target.core : undefined,
+                  adjacent:
+                    typeof target.adjacent === "number" ? target.adjacent : undefined,
+                  transformational:
+                    typeof target.transformational === "number"
+                      ? target.transformational
+                      : undefined,
+                }
+              : undefined,
+          };
+
+          return jsonResponse(options.productEngine.scoreInitiatives(input));
         }
         case "github_list_installations": {
           if (!options.githubService) {

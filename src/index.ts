@@ -1,6 +1,7 @@
 import { loadConfig } from "./config.js";
 import { GitHubAppService } from "./github-wrapper.js";
 import { LinearTemplateService } from "./linear-wrapper.js";
+import { ProductManagementEngineService } from "./product-engine.js";
 import { createMcpServer, runServer } from "./server.js";
 
 async function main(): Promise<void> {
@@ -23,12 +24,18 @@ async function main(): Promise<void> {
         config.github.apiBaseUrl,
       )
     : undefined;
+  const productEngine = new ProductManagementEngineService(
+    service,
+    githubService,
+    config.productEngine,
+  );
 
   const server = createMcpServer({
     serverName: config.serverName,
     serverVersion: config.serverVersion,
     linearService: service,
     githubService,
+    productEngine,
   });
 
   await runServer(server);
