@@ -30,6 +30,24 @@ For repository write operations, the wrapper:
 6. `github_create_issue_from_template`
 7. `github_create_pull_request_from_template`
 
+## Pull Request Binding Guarantee
+
+`github_create_pull_request_from_template` guarantees a bound issue:
+
+1. Reads PR body for same-repo closing references (`Closes #123`, `Fixes #123`, etc.).
+2. If referenced issue exists, reuses it.
+3. If no valid referenced issue exists, creates a new issue automatically.
+4. Ensures PR body contains `Closes #<issue>` so GitHub links PR and issue.
+
+Optional binding controls:
+
+- `bindingIssueTemplateKey`
+- `bindingIssueTitle`
+- `bindingIssueBody`
+- `bindingIssueLabels`
+- `bindingIssueAssignees`
+- `bindingIssueMilestone`
+
 ## Template Enforcement
 
 Built-in templates:
@@ -45,4 +63,3 @@ Behavior:
 - custom extra sections are preserved
 
 Override/add templates using `GITHUB_TEMPLATE_OVERRIDES_JSON`.
-

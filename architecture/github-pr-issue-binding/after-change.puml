@@ -1,0 +1,38 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+
+title GitHub PR Flow After Bound-Issue Guarantee
+
+actor "LLM / Agent" as Agent #E8F0FE
+component "MCP Server\nGitHub Wrapper" as Wrapper #D9EAD3
+component "Issue Resolver\n(closing keyword parser + issue existence check)" as Resolver #FFF4CC
+component "Issue Creator\n(template-enforced)" as Creator #D0E0FF
+component "PR Body Binder\n(appends Closes #n)" as Binder #FCE5CD
+component "GitHub REST API" as Api #FFE5E5
+database "Repository" as Repo #EAF7EA
+
+Agent --> Wrapper : github_create_pull_request_from_template
+Wrapper --> Resolver : find existing bound issue
+Resolver --> Api : get issue by referenced number(s)
+
+Resolver --> Creator : no valid issue found
+Creator --> Api : create issue
+
+Wrapper --> Binder : ensure closing keyword reference
+Binder --> Api : create PR with linked issue reference
+Api --> Repo : issue + PR persisted and linked
+
+note bottom of Wrapper #F3F3F3
+PR path now guarantees a linked issue.
+If issue is missing, it is auto-created first.
+end note
+
+@enduml
+

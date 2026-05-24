@@ -64,6 +64,23 @@ GitHub tools (enabled only when `GITHUB_APP_*` is configured):
 6. `github_create_issue_from_template`
 7. `github_create_pull_request_from_template`
 
+### PR-to-Issue Binding Flow
+
+`github_create_pull_request_from_template` now enforces a bound issue:
+
+1. If PR body already contains a valid same-repo closing reference (for example `Closes #123`), it reuses that issue.
+2. If no valid linked issue exists, it creates one automatically.
+3. It ensures the PR body includes a closing keyword reference so PR and issue are linked.
+
+Optional inputs for auto-created issue:
+
+- `bindingIssueTemplateKey`
+- `bindingIssueTitle`
+- `bindingIssueBody`
+- `bindingIssueLabels`
+- `bindingIssueAssignees`
+- `bindingIssueMilestone`
+
 ### `linear_create_issue_from_template` (core flow)
 
 Required:
