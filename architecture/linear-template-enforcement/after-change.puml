@@ -1,0 +1,32 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+
+title Linear Issue Flow After MCP Template Enforcement
+
+actor "LLM / Agent" as Agent #E8F0FE
+component "TypeScript MCP Server\n(linear-management-mcp)" as Mcp #D9EAD3
+rectangle "Template Layer\n- built-in templates\n- env overrides\n- strict validation\n- normalization" as Templates #D0E0FF
+component "Linear Wrapper\n(@linear/sdk)" as Wrapper #FFF4CC
+component "Linear GraphQL API" as LinearApi #FFE5E5
+database "Linear Workspace" as LinearData #EAF7EA
+
+Agent --> Mcp : Tool calls\n(list/validate/normalize/create/apply)
+Mcp --> Templates : Enforce section contract
+Mcp --> Wrapper : Execute validated mutations
+Wrapper --> LinearApi : createIssue / updateIssue
+LinearApi --> LinearData : Persist normalized issue
+
+note bottom of Templates #F3F3F3
+Every write path can enforce required headings.
+Descriptions become machine-readable and consistent.
+end note
+
+@enduml
+
