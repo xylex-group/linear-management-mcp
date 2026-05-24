@@ -1,16 +1,19 @@
 # linear-management-mcp
 
-TypeScript MCP server that wraps the [Linear](https://linear.app/developers/sdk) API with template-aware issue workflows.
+TypeScript MCP server that wraps:
 
-It is intentionally focused on one operational goal: enforce repeatable issue templates (sections, structure, normalization) when creating or updating Linear issues.
+- [Linear SDK](https://linear.app/developers/sdk) for issue workflows
+- GitHub API through GitHub App authentication (`@octokit/*`)
+
+Both wrappers support template-driven markdown enforcement (`## Heading` sections) for consistent issue/PR payloads.
 
 ## What You Get
 
 - MCP server over `stdio`
-- Linear API wrapper (`@linear/sdk`) with a small stable surface
-- Built-in templates: `bug`, `feature-request`, `engineering-task`
-- Strict template validation + auto-normalization helpers
-- Optional template overrides from environment
+- Linear wrapper with template-aware issue methods
+- GitHub App wrapper with installation-aware repository/issue/PR methods
+- Strict validation and normalization for markdown body templates
+- Environment-based template overrides for both Linear and GitHub
 
 ## Install
 
@@ -20,6 +23,12 @@ cp .env.example .env
 ```
 
 Set `LINEAR_API_KEY` in `.env` before starting.
+
+To enable GitHub tools, also set:
+
+- `GITHUB_APP_ID`
+- `GITHUB_APP_OWNER`
+- `GITHUB_APP_PRIVATE_KEY`
 
 ## Build And Run
 
@@ -36,12 +45,24 @@ npm run dev
 
 ## MCP Tools
 
+Linear tools:
+
 1. `linear_list_teams`
 2. `linear_list_templates`
 3. `linear_validate_template`
 4. `linear_normalize_template`
 5. `linear_create_issue_from_template`
 6. `linear_apply_template_to_issue`
+
+GitHub tools (enabled only when `GITHUB_APP_*` is configured):
+
+1. `github_list_installations`
+2. `github_list_repositories`
+3. `github_list_templates`
+4. `github_validate_template`
+5. `github_normalize_template`
+6. `github_create_issue_from_template`
+7. `github_create_pull_request_from_template`
 
 ### `linear_create_issue_from_template` (core flow)
 
@@ -67,8 +88,17 @@ Optional:
 | `LINEAR_DEFAULT_TEMPLATE` | No | Default template key if `templateKey` is omitted. |
 | `TEMPLATE_STRICT_MODE` | No | `true` by default. Blocks invalid template writes. |
 | `LINEAR_TEMPLATE_OVERRIDES_JSON` | No | JSON object to add/override template definitions. |
+| `GITHUB_APP_ID` | No* | GitHub App ID. Required to enable GitHub wrapper tools. |
+| `GITHUB_APP_OWNER` | No* | Default GitHub owner/org to resolve installation context. |
+| `GITHUB_APP_PRIVATE_KEY` | No* | GitHub App private key PEM (`\\n` escaped form supported). |
+| `GITHUB_API_BASE_URL` | No | Optional GitHub Enterprise API base URL. |
+| `GITHUB_DEFAULT_TEMPLATE` | No | Default GitHub template key (for issue/PR body). |
+| `GITHUB_TEMPLATE_STRICT_MODE` | No | `true` by default for GitHub template write enforcement. |
+| `GITHUB_TEMPLATE_OVERRIDES_JSON` | No | JSON object to add/override GitHub templates. |
 | `SERVER_NAME` | No | MCP server name override (default: `linear-management-mcp`). |
 | `SERVER_VERSION` | No | MCP server version override (default: `0.1.0`). |
+
+`*` GitHub variables are optional overall, but all are required together when enabling GitHub tools.
 
 ## Template Enforcement Behavior
 
@@ -77,7 +107,10 @@ Optional:
 3. Normalization can auto-insert missing sections while preserving extra custom sections.
 4. In strict mode, non-compliant issue writes are rejected.
 
-Extended notes and examples are in [docs/template-enforcement.md](docs/template-enforcement.md).
+Extended notes and examples are in:
+
+- [docs/template-enforcement.md](docs/template-enforcement.md)
+- [docs/github-app-wrapper.md](docs/github-app-wrapper.md)
 
 ## Example MCP Client Wiring
 
@@ -91,7 +124,10 @@ Extended notes and examples are in [docs/template-enforcement.md](docs/template-
       "env": {
         "LINEAR_API_KEY": "lin_api_xxxxx",
         "LINEAR_DEFAULT_TEAM_ID": "team-uuid",
-        "TEMPLATE_STRICT_MODE": "true"
+        "TEMPLATE_STRICT_MODE": "true",
+        "GITHUB_APP_ID": "2995603",
+        "GITHUB_APP_OWNER": "your-org-or-user",
+        "GITHUB_APP_PRIVATE_KEY": "-----BEGIN RSA PRIVATE KEY-----\\n...\\n-----END RSA PRIVATE KEY-----"
       }
     }
   }

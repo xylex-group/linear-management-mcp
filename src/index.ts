@@ -1,4 +1,5 @@
 import { loadConfig } from "./config.js";
+import { GitHubAppService } from "./github-wrapper.js";
 import { LinearTemplateService } from "./linear-wrapper.js";
 import { createMcpServer, runServer } from "./server.js";
 
@@ -11,11 +12,23 @@ async function main(): Promise<void> {
     config.defaultTeamId,
     config.defaultTemplate,
   );
+  const githubService = config.github
+    ? new GitHubAppService(
+        config.github.appId,
+        config.github.owner,
+        config.github.privateKey,
+        config.github.templates,
+        config.github.templateStrictMode,
+        config.github.defaultTemplate,
+        config.github.apiBaseUrl,
+      )
+    : undefined;
 
   const server = createMcpServer({
     serverName: config.serverName,
     serverVersion: config.serverVersion,
-    service,
+    linearService: service,
+    githubService,
   });
 
   await runServer(server);
@@ -26,4 +39,3 @@ main().catch((error) => {
   console.error(`[linear-management-mcp] ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 });
-
