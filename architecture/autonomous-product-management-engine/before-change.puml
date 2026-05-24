@@ -1,0 +1,40 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+skinparam DatabaseBorderColor #000000
+skinparam DatabaseFontColor #000000
+
+title Product Management Flow Before Autonomous Engine
+
+actor "LLM / Agent" as Agent #E8F0FE
+component "MCP Server\nTool Router" as Server #D9EAD3
+component "Linear Template Service\n(create/apply/list templates)" as LinearWrapper #D0E0FF
+component "GitHub App Service\n(create issues + PRs)" as GitHubWrapper #FCE5CD
+component "Template Enforcer\n(section validation)" as Template #FFF4CC
+database "Linear API" as LinearApi #EAF7EA
+database "GitHub REST API" as GitHubApi #FFE5E5
+rectangle "Manual Product Review\nstale work, cycle fit,\nnext-cycle vetting" as Manual #F3F3F3
+
+Agent --> Server : call focused wrapper tools
+Server --> LinearWrapper : Linear issue operations
+Server --> GitHubWrapper : GitHub issue/PR operations
+LinearWrapper --> Template : validate Linear body
+GitHubWrapper --> Template : validate GitHub body
+LinearWrapper --> LinearApi : create/update/list
+GitHubWrapper --> GitHubApi : create/list repositories
+Agent --> Manual : separate reasoning outside server
+
+note bottom of Manual #FFFDEB
+The server can create well-formed issues,
+but stale detection, cycle governance,
+and proactive product signal vetting
+are not first-class server behavior.
+end note
+
+@enduml

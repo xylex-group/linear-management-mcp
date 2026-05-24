@@ -14,6 +14,7 @@ import {
   type TemplateCollection,
   type TemplateOverrideCollection,
 } from "./templates.js";
+import type { ProductManagementEngineConfig } from "./product-engine.js";
 
 export interface ServerConfig {
   apiKey: string;
@@ -22,6 +23,7 @@ export interface ServerConfig {
   templateStrictMode: boolean;
   templates: TemplateCollection;
   github?: GitHubAppConfig;
+  productEngine: ProductManagementEngineConfig;
   serverName: string;
   serverVersion: string;
 }
@@ -53,6 +55,40 @@ function parseBoolean(rawValue: string | undefined, defaultValue: boolean): bool
   throw new Error(
     `Invalid boolean value '${rawValue}' for TEMPLATE_STRICT_MODE. Use true/false.`,
   );
+}
+
+function parsePositiveInteger(
+  rawValue: string | undefined,
+  defaultValue: number,
+  variableName: string,
+): number {
+  if (rawValue === undefined || rawValue.trim() === "") {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${variableName} must be a positive integer. Received '${rawValue}'.`);
+  }
+
+  return parsed;
+}
+
+function parseRatio(
+  rawValue: string | undefined,
+  defaultValue: number,
+  variableName: string,
+): number {
+  if (rawValue === undefined || rawValue.trim() === "") {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseFloat(rawValue);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(`${variableName} must be a number between 0 and 1. Received '${rawValue}'.`);
+  }
+
+  return parsed;
 }
 
 function parseTemplateOverrides(
@@ -182,6 +218,23 @@ export function loadConfig(): ServerConfig {
     templateStrictMode,
     templates,
     github,
+    productEngine: {
+      staleAfterDays: parsePositiveInteger(
+        process.env.PRODUCT_ENGINE_STALE_AFTER_DAYS,
+        14,
+        "PRODUCT_ENGINE_STALE_AFTER_DAYS",
+      ),
+      nextCycleCapacity: parsePositiveInteger(
+        process.env.PRODUCT_ENGINE_NEXT_CYCLE_CAPACITY,
+        10,
+        "PRODUCT_ENGINE_NEXT_CYCLE_CAPACITY",
+      ),
+      signalConfidenceThreshold: parseRatio(
+        process.env.PRODUCT_ENGINE_SIGNAL_CONFIDENCE_THRESHOLD,
+        0.65,
+        "PRODUCT_ENGINE_SIGNAL_CONFIDENCE_THRESHOLD",
+      ),
+    },
     serverName: process.env.SERVER_NAME?.trim() || "linear-management-mcp",
     serverVersion: process.env.SERVER_VERSION?.trim() || "0.1.0",
   };

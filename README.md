@@ -1,17 +1,23 @@
 # linear-management-mcp
 
-TypeScript MCP server that wraps:
+TypeScript MCP server for an autonomous product-management engine that can govern:
 
 - [Linear SDK](https://linear.app/developers/sdk) for issue workflows
 - GitHub API through GitHub App authentication (`@octokit/*`)
 
-Both wrappers support template-driven markdown enforcement (`## Heading` sections) for consistent issue/PR payloads.
+The server still enforces template-driven markdown (`## Heading` sections), but its main surface now adds product governance:
+
+- inspect Linear and GitHub work across backlog and cycles
+- flag stale issues that need recommit, splitting, or closure
+- rank next-cycle candidates from priority, cycle carry-over, labels, ownership, and freshness
+- vet product signals before creating proactive Linear or GitHub issues
 
 ## What You Get
 
 - MCP server over `stdio`
 - Linear wrapper with template-aware issue methods
 - GitHub App wrapper with installation-aware repository/issue/PR methods
+- Product-management engine tools for stale-work detection, cycle vetting, and proactive issue creation
 - Strict validation and normalization for markdown body templates
 - Environment-based template overrides for both Linear and GitHub
 
@@ -64,6 +70,32 @@ GitHub tools (enabled only when `GITHUB_APP_*` is configured):
 6. `github_create_issue_from_template`
 7. `github_create_pull_request_from_template`
 
+Product engine tools:
+
+1. `product_engine_analyze_backlog`
+2. `product_engine_create_proactive_issues`
+
+### Autonomous Product Engine Flow
+
+`product_engine_analyze_backlog` reads live Linear team inventory and optional GitHub repositories, then returns:
+
+- active, next, and previous Linear cycle context
+- previous-cycle carry-over candidates
+- stale open work by configurable age
+- ranked next-cycle candidates with reasoning and recommended actions
+
+`product_engine_create_proactive_issues` accepts product signals and runs a governance gate before writing:
+
+1. validates title, evidence, impact/recommendation, severity, and confidence
+2. returns a plan by default (`mode: "plan"`)
+3. creates Linear issues when `mode: "create-linear"`
+4. creates GitHub issues when `mode: "create-github"` and GitHub App auth is enabled
+
+Built-in proactive templates:
+
+- Linear: `product-opportunity`
+- GitHub: `issue-product-opportunity`
+
 ### PR-to-Issue Binding Flow
 
 `github_create_pull_request_from_template` now enforces a bound issue:
@@ -105,6 +137,9 @@ Optional:
 | `LINEAR_DEFAULT_TEMPLATE` | No | Default template key if `templateKey` is omitted. |
 | `TEMPLATE_STRICT_MODE` | No | `true` by default. Blocks invalid template writes. |
 | `LINEAR_TEMPLATE_OVERRIDES_JSON` | No | JSON object to add/override template definitions. |
+| `PRODUCT_ENGINE_STALE_AFTER_DAYS` | No | Days without updates before open work is treated as stale (default `14`). |
+| `PRODUCT_ENGINE_NEXT_CYCLE_CAPACITY` | No | Default number of candidates to rank for next-cycle planning (default `10`). |
+| `PRODUCT_ENGINE_SIGNAL_CONFIDENCE_THRESHOLD` | No | Minimum confidence for proactive issue creation, from `0` to `1` (default `0.65`). |
 | `GITHUB_APP_ID` | No* | GitHub App ID. Required to enable GitHub wrapper tools. |
 | `GITHUB_APP_OWNER` | No* | Default GitHub owner/org to resolve installation context. |
 | `GITHUB_APP_PRIVATE_KEY` | No* | GitHub App private key PEM (`\\n` escaped form supported). |
@@ -128,6 +163,7 @@ Extended notes and examples are in:
 
 - [docs/template-enforcement.md](docs/template-enforcement.md)
 - [docs/github-app-wrapper.md](docs/github-app-wrapper.md)
+- [docs/product-management-engine.md](docs/product-management-engine.md)
 
 ## Example MCP Client Wiring
 

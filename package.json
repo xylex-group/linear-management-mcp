@@ -1,7 +1,7 @@
 {
   "name": "linear-management-mcp",
   "version": "0.1.0",
-  "description": "Template-enforced Linear wrapper exposed as a TypeScript MCP server",
+  "description": "Autonomous product-management MCP engine for Linear and GitHub governance",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -17,7 +17,9 @@
     "linear",
     "mcp",
     "typescript",
-    "templates"
+    "templates",
+    "product-management",
+    "github"
   ],
   "engines": {
     "node": ">=20.0.0"

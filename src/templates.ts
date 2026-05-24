@@ -59,6 +59,20 @@ export const BUILTIN_TEMPLATES: TemplateCollection = {
     ],
     optionalSections: ["Risks", "References"],
   },
+  "product-opportunity": {
+    key: "product-opportunity",
+    displayName: "Product Opportunity",
+    description: "Capture governed product signals before they become planned work.",
+    titlePrefix: "[Opportunity]",
+    requiredSections: [
+      "Signal",
+      "Customer/User Impact",
+      "Proposed Outcome",
+      "Evidence",
+      "Acceptance Criteria",
+    ],
+    optionalSections: ["Risk And Dependencies", "Cycle Fit", "References"],
+  },
 };
 
 export function normalizeTemplateKey(key: string): string {
@@ -146,4 +160,3 @@ export function mergeTemplates(
 
   return merged;
 }
-

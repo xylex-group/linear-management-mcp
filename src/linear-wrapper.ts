@@ -1,4 +1,4 @@
-import { LinearClient } from "@linear/sdk";
+import { LinearClient, type Cycle, type Issue } from "@linear/sdk";
 
 import {
   buildTemplateSkeleton,
@@ -35,6 +35,74 @@ export interface ApplyTemplateToIssueInput {
   templateKey?: string;
 }
 
+export interface LinearIssueInventoryInput {
+  teamId?: string;
+  limit?: number;
+  includeArchived?: boolean;
+  includeSubTeams?: boolean;
+}
+
+export interface LinearCycleInventoryInput {
+  teamId?: string;
+  limit?: number;
+  includeArchived?: boolean;
+}
+
+export interface LinearIssueInventoryItem {
+  id: string;
+  identifier: string;
+  number: number;
+  title: string;
+  url: string;
+  description?: string;
+  priority: number;
+  priorityLabel: string;
+  labelIds: string[];
+  assigneeId?: string;
+  stateId?: string;
+  teamId?: string;
+  cycleId?: string;
+  projectId?: string;
+  estimate?: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  canceledAt?: string;
+  archivedAt?: string;
+}
+
+export interface LinearCycleInventoryItem {
+  id: string;
+  number: number;
+  name?: string;
+  description?: string;
+  startsAt: string;
+  endsAt: string;
+  completedAt?: string;
+  isActive: boolean;
+  isFuture: boolean;
+  isNext: boolean;
+  isPast: boolean;
+  isPrevious: boolean;
+  progress: number;
+  issueCountHistory: number[];
+  completedIssueCountHistory: number[];
+  scopeHistory: number[];
+  completedScopeHistory: number[];
+}
+
+function clampLimit(limit: number | undefined, defaultValue: number): number {
+  if (limit === undefined || !Number.isFinite(limit)) {
+    return defaultValue;
+  }
+
+  return Math.min(Math.max(Math.trunc(limit), 1), 100);
+}
+
+function dateToString(date: Date | null | undefined): string | undefined {
+  return date ? date.toISOString() : undefined;
+}
+
 export class LinearTemplateService {
   private readonly client: LinearClient;
 
@@ -50,6 +118,17 @@ export class LinearTemplateService {
 
   getTemplates(): IssueTemplate[] {
     return Object.values(this.templates);
+  }
+
+  private resolveTeamId(teamId?: string): string {
+    const resolved = teamId ?? this.defaultTeamId;
+    if (!resolved?.trim()) {
+      throw new Error(
+        "teamId is required. Pass teamId explicitly or set LINEAR_DEFAULT_TEAM_ID in the environment.",
+      );
+    }
+
+    return resolved.trim();
   }
 
   private resolveTemplate(templateKey?: string): IssueTemplate {
@@ -72,6 +151,100 @@ export class LinearTemplateService {
       name: team.name,
       description: team.description ?? "",
     }));
+  }
+
+  private serializeIssue(issue: Issue): LinearIssueInventoryItem {
+    return {
+      id: issue.id,
+      identifier: issue.identifier,
+      number: issue.number,
+      title: issue.title,
+      url: issue.url,
+      description: issue.description ?? undefined,
+      priority: issue.priority,
+      priorityLabel: issue.priorityLabel,
+      labelIds: issue.labelIds,
+      assigneeId: issue.assigneeId,
+      stateId: issue.stateId,
+      teamId: issue.teamId,
+      cycleId: issue.cycleId,
+      projectId: issue.projectId,
+      estimate: issue.estimate ?? undefined,
+      createdAt: issue.createdAt.toISOString(),
+      updatedAt: issue.updatedAt.toISOString(),
+      completedAt: dateToString(issue.completedAt),
+      canceledAt: dateToString(issue.canceledAt),
+      archivedAt: dateToString(issue.archivedAt),
+    };
+  }
+
+  private serializeCycle(cycle: Cycle): LinearCycleInventoryItem {
+    return {
+      id: cycle.id,
+      number: cycle.number,
+      name: cycle.name ?? undefined,
+      description: cycle.description ?? undefined,
+      startsAt: cycle.startsAt.toISOString(),
+      endsAt: cycle.endsAt.toISOString(),
+      completedAt: dateToString(cycle.completedAt),
+      isActive: cycle.isActive,
+      isFuture: cycle.isFuture,
+      isNext: cycle.isNext,
+      isPast: cycle.isPast,
+      isPrevious: cycle.isPrevious,
+      progress: cycle.progress,
+      issueCountHistory: cycle.issueCountHistory,
+      completedIssueCountHistory: cycle.completedIssueCountHistory,
+      scopeHistory: cycle.scopeHistory,
+      completedScopeHistory: cycle.completedScopeHistory,
+    };
+  }
+
+  async listIssueInventory(input: LinearIssueInventoryInput = {}) {
+    const teamId = this.resolveTeamId(input.teamId);
+    const team = await this.client.team(teamId);
+    if (!team?.id) {
+      throw new Error(`Linear team '${teamId}' not found.`);
+    }
+
+    const issues = await team.issues({
+      first: clampLimit(input.limit, 50),
+      includeArchived: input.includeArchived ?? false,
+      includeSubTeams: input.includeSubTeams ?? true,
+    });
+
+    return {
+      team: {
+        id: team.id,
+        key: team.key,
+        name: team.name,
+      },
+      totalReturned: issues.nodes.length,
+      issues: issues.nodes.map((issue) => this.serializeIssue(issue)),
+    };
+  }
+
+  async listCycleInventory(input: LinearCycleInventoryInput = {}) {
+    const teamId = this.resolveTeamId(input.teamId);
+    const team = await this.client.team(teamId);
+    if (!team?.id) {
+      throw new Error(`Linear team '${teamId}' not found.`);
+    }
+
+    const cycles = await team.cycles({
+      first: clampLimit(input.limit, 20),
+      includeArchived: input.includeArchived ?? false,
+    });
+
+    return {
+      team: {
+        id: team.id,
+        key: team.key,
+        name: team.name,
+      },
+      totalReturned: cycles.nodes.length,
+      cycles: cycles.nodes.map((cycle) => this.serializeCycle(cycle)),
+    };
   }
 
   async validateTemplate(input: ValidateTemplateInput) {
@@ -213,4 +386,3 @@ export class LinearTemplateService {
     };
   }
 }
-
