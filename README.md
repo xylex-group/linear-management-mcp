@@ -74,6 +74,7 @@ Product engine tools:
 
 1. `product_engine_analyze_backlog`
 2. `product_engine_create_proactive_issues`
+3. `product_engine_score_initiatives`
 
 ### Autonomous Product Engine Flow
 
@@ -83,13 +84,20 @@ Product engine tools:
 - previous-cycle carry-over candidates
 - stale open work by configurable age
 - ranked next-cycle candidates with reasoning and recommended actions
+- Now/Next/Later outcome roadmap slices
+- portfolio review using a configurable 70/20/10-style heuristic
+- governance gaps for missing metrics, guardrails, kill criteria, or decision reversal criteria
 
 `product_engine_create_proactive_issues` accepts product signals and runs a governance gate before writing:
 
-1. validates title, evidence, impact/recommendation, severity, and confidence
-2. returns a plan by default (`mode: "plan"`)
-3. creates Linear issues when `mode: "create-linear"`
-4. creates GitHub issues when `mode: "create-github"` and GitHub App auth is enabled
+1. validates title, evidence quality, impact/recommendation, severity, and confidence
+2. requires an outcome metric with formula, timeframe, and data source
+3. requires guardrail metrics, privacy/security/accessibility notes, kill criteria, and "what would change my mind"
+4. returns a plan by default (`mode: "plan"`)
+5. creates Linear issues when `mode: "create-linear"`
+6. creates GitHub issues when `mode: "create-github"` and GitHub App auth is enabled
+
+`product_engine_score_initiatives` scores candidate bets using `rice`, `ice`, `wsjf`, or `opportunity`, then returns a ranked list, Now/Next/Later roadmap, portfolio mix, and governance gaps.
 
 Built-in proactive templates:
 

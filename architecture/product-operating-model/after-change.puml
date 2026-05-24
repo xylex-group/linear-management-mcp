@@ -1,0 +1,54 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+skinparam DatabaseBorderColor #000000
+skinparam DatabaseFontColor #000000
+
+title Product Operating Model After PM Toolkit Expansion
+
+actor "LLM / Agent" as Agent #E8F0FE
+component "Product Management Engine" as Engine #D0E0FF
+component "Backlog Analyzer\nstale + cycle ranking" as Analyzer #D9EAD3
+component "Governance Gap Auditor\nmetrics + guardrails + kill criteria" as Auditor #FFF4CC
+component "Initiative Scorecard\nRICE / ICE / WSJF / opportunity" as Scorecard #EADCF8
+component "Outcome Roadmap Builder\nNow / Next / Later / Park" as Roadmap #D9EAD3
+component "Portfolio Review\ncore / adjacent / transformational" as Portfolio #FCE5CD
+component "Signal Vetting Gate\nevidence quality + decision reversal" as Vetting #FFE5E5
+component "Issue Creation\nLinear / GitHub opportunity templates" as Creator #FCE5CD
+database "Linear + GitHub Work" as Work #EAF7EA
+
+Agent --> Engine : analyze backlog
+Engine --> Analyzer : score live work
+Analyzer --> Work : read issues and cycles
+Analyzer --> Auditor : inspect descriptions for PM governance gaps
+Analyzer --> Roadmap : derive planning slices
+Analyzer --> Portfolio : classify current work mix
+Engine --> Agent : stale report,\nroadmap,\nportfolio,\ngovernance gaps
+
+Agent --> Engine : score initiatives
+Engine --> Scorecard : apply selected framework
+Scorecard --> Auditor : reject weakly governed bets
+Scorecard --> Roadmap : build Now / Next / Later / Park
+Scorecard --> Portfolio : compare against target mix
+Engine --> Agent : ranked roadmap plan
+
+Agent --> Engine : create proactive issues
+Engine --> Vetting : require evidence quality,\noutcome metric,\nguardrails,\nkill criteria,\nprivacy/security/accessibility
+Vetting --> Creator : qualified signal only
+Creator --> Work : create governed issue
+
+note bottom of Engine #F3F3F3
+The MCP server now acts as an operating system
+for product decisions: it scores bets consistently,
+forces measurable outcomes and guardrails,
+preserves kill criteria, and keeps roadmap work
+balanced against portfolio strategy.
+end note
+
+@enduml

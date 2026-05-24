@@ -68,10 +68,14 @@ export const BUILTIN_TEMPLATES: TemplateCollection = {
       "Signal",
       "Customer/User Impact",
       "Proposed Outcome",
+      "Outcome Metric",
+      "Guardrails",
       "Evidence",
       "Acceptance Criteria",
+      "Kill Criteria",
+      "What Would Change My Mind",
     ],
-    optionalSections: ["Risk And Dependencies", "Cycle Fit", "References"],
+    optionalSections: ["Risk And Dependencies", "Portfolio Bet", "Cycle Fit", "References"],
   },
 };
 

@@ -1,0 +1,37 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+skinparam DatabaseBorderColor #000000
+skinparam DatabaseFontColor #000000
+
+title Product Operating Model Before PM Toolkit Expansion
+
+actor "LLM / Agent" as Agent #E8F0FE
+component "Product Management Engine" as Engine #D0E0FF
+component "Backlog Analyzer\nstale + cycle ranking" as Analyzer #D9EAD3
+component "Signal Vetting Gate\nconfidence + evidence" as Vetting #FFF4CC
+component "Issue Creation\nLinear / GitHub" as Creator #FCE5CD
+database "Linear + GitHub Work" as Work #EAF7EA
+
+Agent --> Engine : analyze backlog\nor create proactive issues
+Engine --> Analyzer : score live work
+Analyzer --> Work : read issues and cycles
+Engine --> Vetting : check signal fields
+Vetting --> Creator : qualified signal
+Creator --> Work : create templated issue
+
+note bottom of Engine #FFFDEB
+The engine can find stale work and vet signals,
+but PM discipline is still shallow:
+metrics, guardrails, kill criteria,
+portfolio allocation, and roadmap scoring
+are not enforced as first-class outputs.
+end note
+
+@enduml
