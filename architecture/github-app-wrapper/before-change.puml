@@ -1,0 +1,32 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+
+title MCP Architecture Before GitHub App Wrapper
+
+actor "LLM / Agent" as Agent #E8F0FE
+component "MCP Server\n(linear-management-mcp)" as Mcp #D9EAD3
+rectangle "Linear Template Layer" as LinearTemplates #D0E0FF
+component "Linear Wrapper\n(@linear/sdk)" as LinearWrapper #FFF4CC
+component "Linear API" as LinearApi #FFE5E5
+database "Linear Workspace" as LinearDb #EAF7EA
+
+Agent --> Mcp : Linear tool calls
+Mcp --> LinearTemplates : Validate/normalize markdown
+Mcp --> LinearWrapper : Create/update issues
+LinearWrapper --> LinearApi
+LinearApi --> LinearDb
+
+note bottom of Mcp #FFFDEB
+No GitHub App integration.
+No installation-aware GitHub operations.
+end note
+
+@enduml
+

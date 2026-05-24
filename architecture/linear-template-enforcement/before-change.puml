@@ -1,0 +1,28 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+
+title Linear Issue Flow Before Template Enforcement
+
+actor "LLM / Agent" as Agent #E8F0FE
+rectangle "Ad-hoc Integration Script\n(or direct API calls)" as Script #FFF4CC
+component "Linear GraphQL API" as LinearApi #FFE5E5
+database "Linear Workspace" as LinearData #EAF7EA
+note right of Script #FFFDEB
+No central template contract.
+Issue descriptions vary by caller.
+Validation is manual and inconsistent.
+end note
+
+Agent --> Script : Unstructured issue request
+Script --> LinearApi : createIssue / updateIssue
+LinearApi --> LinearData : Persist issue payload
+
+@enduml
+

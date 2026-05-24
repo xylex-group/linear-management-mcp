@@ -1,0 +1,50 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+
+title MCP Architecture After GitHub App Wrapper
+
+actor "LLM / Agent" as Agent #E8F0FE
+component "MCP Server\n(linear-management-mcp)" as Mcp #D9EAD3
+
+rectangle "Linear Path" as LinearPath #F2F8FF {
+  rectangle "Linear Template Layer" as LinearTemplates #D0E0FF
+  component "Linear Wrapper\n(@linear/sdk)" as LinearWrapper #FFF4CC
+  component "Linear API" as LinearApi #FFE5E5
+}
+
+rectangle "GitHub Path" as GitHubPath #FFF8EE {
+  rectangle "GitHub Template Layer" as GitHubTemplates #FFEFD5
+  component "GitHub App Wrapper\n(@octokit/auth-app + @octokit/rest)" as GitHubWrapper #FFF4CC
+  component "GitHub App Auth\n(JWT + Installation Token)" as GitHubAuth #FCE5CD
+  component "GitHub REST API" as GitHubApi #FFE5E5
+}
+
+database "Linear Workspace" as LinearDb #EAF7EA
+database "GitHub Repositories" as GitHubDb #EAF7EA
+
+Agent --> Mcp : Linear + GitHub tool calls
+Mcp --> LinearTemplates
+Mcp --> LinearWrapper
+LinearWrapper --> LinearApi
+LinearApi --> LinearDb
+
+Mcp --> GitHubTemplates
+Mcp --> GitHubWrapper
+GitHubWrapper --> GitHubAuth : Resolve owner installation
+GitHubAuth --> GitHubApi : Installation-scoped requests
+GitHubApi --> GitHubDb
+
+note bottom of GitHubWrapper #F3F3F3
+Issue/PR body templates are validated and normalized
+before create calls.
+end note
+
+@enduml
+
