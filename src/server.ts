@@ -279,7 +279,7 @@ export function createMcpServer(options: McpServerOptions): Server {
         {
           name: "github_create_pull_request_from_template",
           description:
-            "Create a GitHub pull request using template-enforced markdown body sections.",
+            "Create a GitHub pull request with template enforcement and guaranteed bound issue linkage.",
           inputSchema: {
             type: "object",
             additionalProperties: false,
@@ -302,6 +302,35 @@ export function createMcpServer(options: McpServerOptions): Server {
               autofillMissingSections: {
                 type: "boolean",
                 description: "Auto-insert missing template sections before create.",
+              },
+              bindingIssueTemplateKey: {
+                type: "string",
+                description:
+                  "Template key for auto-created binding issue when no linked issue exists (defaults to issue-feature).",
+              },
+              bindingIssueTitle: {
+                type: "string",
+                description:
+                  "Custom title for auto-created binding issue when no linked issue exists.",
+              },
+              bindingIssueBody: {
+                type: "string",
+                description:
+                  "Custom body for auto-created binding issue when no linked issue exists.",
+              },
+              bindingIssueLabels: {
+                type: "array",
+                items: { type: "string" },
+                description: "Label names for auto-created binding issue.",
+              },
+              bindingIssueAssignees: {
+                type: "array",
+                items: { type: "string" },
+                description: "Assignee logins for auto-created binding issue.",
+              },
+              bindingIssueMilestone: {
+                type: "number",
+                description: "Milestone number for auto-created binding issue.",
               },
             },
             required: ["repo", "title", "head", "base"],
@@ -516,6 +545,26 @@ export function createMcpServer(options: McpServerOptions): Server {
               autofillMissingSections:
                 typeof args.autofillMissingSections === "boolean"
                   ? args.autofillMissingSections
+                  : undefined,
+              bindingIssueTemplateKey:
+                typeof args.bindingIssueTemplateKey === "string"
+                  ? args.bindingIssueTemplateKey
+                  : undefined,
+              bindingIssueTitle:
+                typeof args.bindingIssueTitle === "string"
+                  ? args.bindingIssueTitle
+                  : undefined,
+              bindingIssueBody:
+                typeof args.bindingIssueBody === "string" ? args.bindingIssueBody : undefined,
+              bindingIssueLabels: Array.isArray(args.bindingIssueLabels)
+                ? args.bindingIssueLabels.filter((item): item is string => typeof item === "string")
+                : undefined,
+              bindingIssueAssignees: Array.isArray(args.bindingIssueAssignees)
+                ? args.bindingIssueAssignees.filter((item): item is string => typeof item === "string")
+                : undefined,
+              bindingIssueMilestone:
+                typeof args.bindingIssueMilestone === "number"
+                  ? args.bindingIssueMilestone
                   : undefined,
             }),
           );

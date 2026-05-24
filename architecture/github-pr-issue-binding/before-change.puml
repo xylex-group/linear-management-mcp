@@ -1,0 +1,28 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+
+title GitHub PR Flow Before Bound-Issue Guarantee
+
+actor "LLM / Agent" as Agent #E8F0FE
+component "MCP Server\nGitHub Wrapper" as Wrapper #D9EAD3
+component "GitHub REST API" as Api #FFE5E5
+database "Repository" as Repo #EAF7EA
+
+Agent --> Wrapper : github_create_pull_request_from_template
+Wrapper --> Api : create PR with template body
+Api --> Repo : PR created
+
+note right of Wrapper #FFFDEB
+Issue binding depends on caller body content.
+PR can be created without a linked issue.
+end note
+
+@enduml
+

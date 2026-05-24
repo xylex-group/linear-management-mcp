@@ -58,6 +58,20 @@ export interface GitHubCreatePullRequestInput {
   draft?: boolean;
   maintainerCanModify?: boolean;
   autofillMissingSections?: boolean;
+  bindingIssueTemplateKey?: string;
+  bindingIssueTitle?: string;
+  bindingIssueBody?: string;
+  bindingIssueLabels?: string[];
+  bindingIssueAssignees?: string[];
+  bindingIssueMilestone?: number;
+}
+
+interface BoundIssueInfo {
+  id: number;
+  number: number;
+  title: string;
+  url: string;
+  created: boolean;
 }
 
 export class GitHubAppService {
@@ -266,6 +280,156 @@ export class GitHubAppService {
     };
   }
 
+  private extractClosingIssueNumbers(
+    body: string,
+    owner: string,
+    repo: string,
+  ): number[] {
+    const issueNumbers = new Set<number>();
+    const pattern =
+      /(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s+(?:(?<owner>[a-z0-9_.-]+)\/(?<repo>[a-z0-9_.-]+))?#(?<issueNumber>\d+)/gi;
+
+    for (const match of body.matchAll(pattern)) {
+      const issueNumberRaw = match.groups?.issueNumber;
+      if (!issueNumberRaw) {
+        continue;
+      }
+
+      const referencedOwner = match.groups?.owner?.toLowerCase();
+      const referencedRepo = match.groups?.repo?.toLowerCase();
+      if (referencedRepo) {
+        const isSameRepo =
+          referencedOwner === owner.toLowerCase() &&
+          referencedRepo === repo.toLowerCase();
+        if (!isSameRepo) {
+          continue;
+        }
+      }
+
+      const issueNumber = Number.parseInt(issueNumberRaw, 10);
+      if (Number.isFinite(issueNumber) && issueNumber > 0) {
+        issueNumbers.add(issueNumber);
+      }
+    }
+
+    return [...issueNumbers];
+  }
+
+  private async findExistingBoundIssue(
+    octokit: Octokit,
+    owner: string,
+    repo: string,
+    body: string,
+  ): Promise<BoundIssueInfo | null> {
+    const issueNumbers = this.extractClosingIssueNumbers(body, owner, repo);
+    for (const issueNumber of issueNumbers) {
+      try {
+        const response = await octokit.rest.issues.get({
+          owner,
+          repo,
+          issue_number: issueNumber,
+        });
+        const issueLike = response.data as { pull_request?: unknown };
+        if (issueLike.pull_request) {
+          continue;
+        }
+
+        return {
+          id: response.data.id,
+          number: response.data.number,
+          title: response.data.title,
+          url: response.data.html_url,
+          created: false,
+        };
+      } catch (error) {
+        const status = (error as { status?: number }).status;
+        if (status === 404) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    return null;
+  }
+
+  private appendClosingReference(
+    body: string,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+  ): string {
+    const pattern = new RegExp(
+      String.raw`(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s+(?:(?<owner>[a-z0-9_.-]+)\/(?<repo>[a-z0-9_.-]+))?#${issueNumber}\b`,
+      "gi",
+    );
+
+    for (const match of body.matchAll(pattern)) {
+      const referencedOwner = match.groups?.owner?.toLowerCase();
+      const referencedRepo = match.groups?.repo?.toLowerCase();
+      if (!referencedOwner && !referencedRepo) {
+        return body;
+      }
+
+      if (
+        referencedOwner === owner.toLowerCase() &&
+        referencedRepo === repo.toLowerCase()
+      ) {
+        return body;
+      }
+    }
+
+    const trimmed = body.trimEnd();
+    const prefix = trimmed.length > 0 ? `${trimmed}\n\n` : "";
+    return `${prefix}## Linked Issue\nCloses #${issueNumber}`;
+  }
+
+  private async ensureBoundIssueForPullRequest(input: {
+    octokit: Octokit;
+    owner: string;
+    repo: string;
+    pullRequestTitle: string;
+    pullRequestBody: string;
+    createInput: GitHubCreatePullRequestInput;
+  }): Promise<BoundIssueInfo> {
+    const existing = await this.findExistingBoundIssue(
+      input.octokit,
+      input.owner,
+      input.repo,
+      input.pullRequestBody,
+    );
+    if (existing) {
+      return existing;
+    }
+
+    const createdIssue = await this.createIssueFromTemplate({
+      owner: input.owner,
+      repo: input.repo,
+      title:
+        input.createInput.bindingIssueTitle?.trim() ||
+        `Tracking: ${input.pullRequestTitle}`,
+      templateKey: input.createInput.bindingIssueTemplateKey ?? "issue-feature",
+      body: input.createInput.bindingIssueBody,
+      labels: input.createInput.bindingIssueLabels,
+      assignees: input.createInput.bindingIssueAssignees,
+      milestone: input.createInput.bindingIssueMilestone,
+      autofillMissingSections: true,
+    });
+
+    if (!createdIssue.issue) {
+      throw new Error("Failed to create a binding issue for this pull request.");
+    }
+
+    return {
+      id: createdIssue.issue.id,
+      number: createdIssue.issue.number,
+      title: createdIssue.issue.title,
+      url: createdIssue.issue.url,
+      created: true,
+    };
+  }
+
   async createIssueFromTemplate(input: GitHubCreateIssueInput) {
     if (!input.repo?.trim()) {
       throw new Error("repo is required.");
@@ -370,13 +534,27 @@ export class GitHubAppService {
     }
 
     const { octokit, ownerLogin, installationId } = await this.installationOctokit(input.owner);
+    const boundIssue = await this.ensureBoundIssueForPullRequest({
+      octokit,
+      owner: ownerLogin,
+      repo: input.repo.trim(),
+      pullRequestTitle: input.title.trim(),
+      pullRequestBody: finalBody,
+      createInput: input,
+    });
+    const boundBody = this.appendClosingReference(
+      finalBody,
+      ownerLogin,
+      input.repo.trim(),
+      boundIssue.number,
+    );
     const response = await octokit.rest.pulls.create({
       owner: ownerLogin,
       repo: input.repo.trim(),
       title: input.title.trim(),
       head: input.head.trim(),
       base: input.base.trim(),
-      body: finalBody,
+      body: boundBody,
       draft: input.draft,
       maintainer_can_modify: input.maintainerCanModify,
     });
@@ -386,6 +564,7 @@ export class GitHubAppService {
       installationId,
       template: template.key,
       validation: finalValidation,
+      bindingIssue: boundIssue,
       pullRequest: {
         id: response.data.id,
         number: response.data.number,
@@ -395,4 +574,3 @@ export class GitHubAppService {
     };
   }
 }
-
