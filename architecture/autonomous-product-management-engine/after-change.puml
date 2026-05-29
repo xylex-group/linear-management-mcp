@@ -1,0 +1,54 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam shadowing false
+skinparam ArrowColor #000000
+skinparam ComponentBorderColor #000000
+skinparam ComponentFontColor #000000
+skinparam RectangleBorderColor #000000
+skinparam RectangleFontColor #000000
+skinparam DatabaseBorderColor #000000
+skinparam DatabaseFontColor #000000
+
+title Product Management Flow After Autonomous Engine
+
+actor "LLM / Agent" as Agent #E8F0FE
+component "MCP Server\nTool Router" as Server #D9EAD3
+component "Product Management Engine\nanalysis + governance" as Engine #D0E0FF
+component "Inventory Collectors\nLinear issues/cycles + GitHub issues" as Inventory #FFF4CC
+component "Work Normalizer\nsingle backlog model" as Normalizer #EADCF8
+component "Policy Scorer\nstale + next-cycle ranking" as Scorer #D9EAD3
+component "Signal Vetting Gate\nevidence + confidence checks" as Vetting #FCE5CD
+component "Template Enforcer\nproduct opportunity bodies" as Template #FFF4CC
+component "Linear Template Service" as LinearWrapper #D0E0FF
+component "GitHub App Service" as GitHubWrapper #FCE5CD
+database "Linear API\nissues + cycles" as LinearApi #EAF7EA
+database "GitHub REST API\nissues + PRs" as GitHubApi #FFE5E5
+
+Agent --> Server : product_engine_analyze_backlog
+Server --> Engine : run planning analysis
+Engine --> Inventory : collect live work
+Inventory --> LinearWrapper : list issues + cycles
+Inventory --> GitHubWrapper : list repository issues
+LinearWrapper --> LinearApi : team inventory
+GitHubWrapper --> GitHubApi : repository inventory
+Inventory --> Normalizer : source snapshots
+Normalizer --> Scorer : normalized work items
+Scorer --> Engine : stale items,\nprevious-cycle carry-over,\nnext-cycle candidates
+Engine --> Agent : governed planning report
+
+Agent --> Server : product_engine_create_proactive_issues
+Server --> Engine : vet product signals
+Engine --> Vetting : require evidence,\nimpact/recommendation,\nconfidence threshold
+Vetting --> Template : build opportunity body
+Template --> LinearWrapper : create Linear issue
+Template --> GitHubWrapper : create GitHub issue
+
+note bottom of Engine #F3F3F3
+The MCP server now owns product governance:
+it can inspect work, flag stale items,
+rank next-cycle candidates, and create
+new issues only after signal vetting.
+end note
+
+@enduml
